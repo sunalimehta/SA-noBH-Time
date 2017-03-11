@@ -1,0 +1,86 @@
+# to resmaple survival time for CoxPH model
+library(snow)
+library(affy)
+library(survival)
+
+print("How many cores does your machine or cluster have?") # added for multicore use
+cores<-as.numeric(readLines(con = stdin(), n = 1, ok = TRUE))
+print("")
+
+cores = 4 # SM 
+
+print("Do you wish to reuse a previously loaded data file - yes=(y)?")
+Fl<-readLines(con = stdin(), n = 1, ok = TRUE)
+print("How many iterations?")
+nitta<-as.numeric(readLines(con = stdin(), n = 1, ok = TRUE))
+nitta = 10 # number of interations (SM)
+nitt<-round(nitta/cores) 
+
+percentchange<-20 # percent patients to change data for
+timechange<-1 # We will need to try various numbers of years you add/subtract to survival times, 1 year is used in this case. 
+
+if(Fl!="y") {
+rint("CHOOSE FILE")
+FileChoice<-file.choose() # choose input file
+a <- read.delim(FileChoice, skip=0, sep="\t", as.is=TRUE, header=FALSE)
+print("FIle is read")
+b<-t(a)
+colnames(b)<-b[1,]
+b<-b[-1,]
+
+CCC<-b[,4:length(b[1,])]
+time<-as.numeric(b[,2])
+status<-as.numeric(b[,3])
+}
+l<-length(CCC[1,]) # number of genes
+np<-length(time) # number of patients
+rn<-round(np*percentchange/100) # number of patients for whom to replace data
+
+outta<-matrix(NA,nrow=length(CCC[1,]),ncol=(nitta+1))
+outta[,1]<-colnames(CCC)
+
+cl <- makeSOCKcluster(rep("localhost", (cores-1))) # set up clusters
+
+# ensure required package is on all nodes
+clusterEvalQ(cl, library(survival))
+
+# define the function you want to perform on each slave in your cluster
+
+ff<-function(nitt, percentchange, timechange, CCC, time, status, l, np, rn){
+
+outt<-matrix(NA,nrow=length(CCC[1,]),ncol=(nitt+1))
+outt[,1]<-colnames(CCC)
+
+for (itcounter in 1:nitt) {
+#replace 'percentchange' of patient surv times with surv time +/- 'timechange' years, replacing half with 'timechange' MORE years and half with 'timechange' LESS years
+resamptime <- time
+tindex<-sample(1:np,rn,replace = FALSE) # get indices of patients to have times additively changed
+tindexadd<-tindex[1:round(length(tindex)/2)] # additively change this 1/2
+resamptime[tindexadd]<-resamptime[tindexadd]+timechange #make the additive changes
+tindexsub<-tindex[(round(length(tindex)/2)+1):length(tindex)] # subtractively change this 1/2
+resamptime[tindexsub]<-resamptime[tindexsub]-timechange #make the subtractive changes
+resamptime[time<=0]<-0.01 #replace any negative years generated with a number close to zero
+for (counter in 1:l) {
+if(trunc(counter/100)== counter/100){
+ print(paste("itteration", itcounter,"      gene", counter))
+}
+x<-CCC[,counter];	y<-data.frame(cbind(resamptime,status,x))
+z<-as.matrix(y$resamptime); y$resamptime <-as.numeric(z)
+z<-as.matrix(y$status); y$status<-as.numeric(z)
+z<-as.matrix(y$x);y$x<-as.numeric(z)
+x<-as.numeric(x)
+k<-coxph( Surv(resamptime, status) ~ x, y)
+d<-summary(k);outt[counter,itcounter +1]<-d$coef[5]
+	}
+	}
+	return(outt)
+	}
+	r<-clusterCall(cl, ff, nitt, percentchange, timechange, CCC, time, status, l, np, rn)	
+stopCluster(cl) 
+outta<-r[[1]]
+for (countz in 2:cores-1) {
+	bv<-r[[countz]]
+	outta <-cbind(outta,bv[,-1])
+	}
+colnames(outta)<-c("geneID",paste("iteration",1:(ncol(outta)-1)))
+write.table(outta,file="resmapled_survival_TTR.txt", sep="\t", row.names=TRUE, col.names=TRUE,append=TRUE) # write resampled p values out
