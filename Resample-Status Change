@@ -1,0 +1,48 @@
+library(affy)
+library(survival)
+
+nitt<-1000
+percentchange<-10 # percent patients to change data for
+timechange<-1 # We will need to try various numbers of years you add/subtract to survival times, 1 year is used in this case. 
+
+FileChoice<-file.choose() # choose input file
+a <- read.delim(FileChoice, skip=0, sep="\t", as.is=TRUE, header=FALSE)
+print("FIle is read")
+b<-t(a)
+colnames(b)<-b[1,]
+b<-b[-1,]
+
+CCC<-b[,4:length(b[1,])]
+time<-as.numeric(b[,2])
+status<-as.numeric(b[,3])
+
+outt<-matrix(NA,nrow=length(CCC[1,]),ncol=(nitt+1))
+outt[,1]<-colnames(CCC)
+
+l<-length(CCC[1,]) # number of genes
+np<-length(time) # number of patients
+rn<-round(np*percentchange/100) # number of patients for whom to replace data
+
+for (itcounter in 1:nitt) {
+resampstatus <- status
+sindex<-sample(1:np,rn,replace = FALSE)
+for (c in 1:rn) {
+	if(resampstatus[sindex[c]]==1){resampstatus[sindex[c]]<-0}
+	if(resampstatus[sindex[c]]==0){resampstatus[sindex[c]]<-1}
+	}
+	
+for (counter in 1:l) {
+if(trunc(counter/100)== counter/100){
+ print(paste("itteration", itcounter,"      gene", counter))
+}
+x<-CCC[,counter];	y<-data.frame(cbind(time,resampstatus,x))
+z<-as.matrix(y$time); y$time <-as.numeric(z)
+z<-as.matrix(y$resampstatus); y$resampstatus<-as.numeric(z)
+z<-as.matrix(y$x);y$x<-as.numeric(z)
+x<-as.numeric(x)
+k<-coxph( Surv(time, resampstatus) ~ x, y)
+d<-summary(k);outt[counter,itcounter +1]<-d$coef[5]
+	}
+	}
+outd<-rbind(c("gene or Principal Component",paste("itteration",1:nitt,sep="")),outt)
+write.table(outd,file="resmapled_survival_10percent_1000it_Final.txt", sep="\t", row.names=FALSE, col.names=FALSE,append=TRUE) # write resampled p values out
