@@ -90,4 +90,27 @@ for (countz in 2:cores-1) {
 	}
 colnames(outta)<-c("geneID",paste("iteration",1:(ncol(outta)-1)))
 	
-write.table(outta,file="resmapled_survival_TTR.txt", sep="\t", row.names=TRUE, col.names=TRUE,append=TRUE) # write resampled p values out
+write.table(outta,file="resmapled_survival_status.txt", sep="\t", row.names=TRUE, col.names=TRUE,append=TRUE) # write resampled p values out
+
+# For BH correction
+# Input file is the resampled_survival file without BH correction
+input = read.delim("resmapled_survival_status.txt", header = TRUE)
+dim(input)
+
+probe = input[,1]
+probe.mat = as.matrix(probe)
+
+output = matrix(data=NA, nrow= 22277, ncol=1001)
+
+for (i in 2:1001)
+{ 
+count = input[,i]
+output[,i] = p.adjust(count, method = "BH", n = length(count))
+print(i)
+}
+
+output.final = cbind(probe.mat, output)
+
+write.table(output.final, "BH_conversion_Status.txt", sep="\t", row.names=TRUE, col.names=TRUE, append=TRUE, quote = FALSE)
+
+
