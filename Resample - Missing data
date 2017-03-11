@@ -43,3 +43,25 @@ d<-summary(k);outt[counter,itcounter +1]<-d$coef[5]
 	}
 outd<-rbind(c("gene or Principal Component",paste("itteration",1:nitt,sep="")),outt)
 write.table(outd,file="resmapled_survival.txt", sep="\t", row.names=FALSE, col.names=FALSE,append=TRUE) # write resampled p values out
+
+# For BH correction
+# Read in the input file 
+
+input = read.delim("resampled_survival.txt", header = TRUE)
+dim(input)
+
+probe = input[,1]
+probe.mat = as.matrix(probe)
+
+output = matrix(data=NA, nrow= 22277, ncol=1001)
+
+for (i in 2:1001)
+{ 
+count = input[,i]
+output[,i] = p.adjust(count, method = "BH", n = length(count))
+print(i)
+}
+
+output.final = cbind(probe.mat, output)
+
+write.table(output.final, "BH_conversion.txt", sep="\t", row.names=TRUE, col.names=TRUE, append=TRUE, quote = FALSE)
