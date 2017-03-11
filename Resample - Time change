@@ -86,7 +86,7 @@ for (countz in 2:cores-1) {
 colnames(outta)<-c("geneID",paste("iteration",1:(ncol(outta)-1)))
 write.table(outta,file="resmapled_survival_TTR.txt", sep="\t", row.names=TRUE, col.names=TRUE,append=TRUE) # write resampled p values out
 # For BH correction
-# Read the input file
+# Input file is the resampled_survival file without BH correction
 input = read.delim("resmapled_survival_TTR.txt", header = TRUE)
 dim(input)
 
