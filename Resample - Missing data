@@ -45,7 +45,7 @@ outd<-rbind(c("gene or Principal Component",paste("itteration",1:nitt,sep="")),o
 write.table(outd,file="resmapled_survival.txt", sep="\t", row.names=FALSE, col.names=FALSE,append=TRUE) # write resampled p values out
 
 # For BH correction
-# Read in the input file 
+# Input file is the resampled_survival file without BH correction 
 
 input = read.delim("resampled_survival.txt", header = TRUE)
 dim(input)
